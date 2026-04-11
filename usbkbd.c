@@ -13,22 +13,19 @@
 #include <linux/input.h>
 #include <locale.h>
 
-static const char *VERSION        = "0.0.1";
+static const char *VERSION        = "0.0.2";
 static const char *DESCRIPTION    = tr("Send keypresses from USB keyboard to VDR");
 
 #define DEBUG 1
 #define RECONNECTDELAY 3000 // ms
 
 const char* usbkbd_device = "/dev/usbkbd_event";
-
-uint8_t buf[64];
+int fd = -1;
 
 class cUsbkbdRemote : public cRemote, private cThread {
 private:
-  bool Connect(void);
   void Action(void);
   bool Ready();
-  int fd;
   struct input_event event;
 public:
   cUsbkbdRemote(const char *Name);
@@ -39,42 +36,17 @@ cUsbkbdRemote::cUsbkbdRemote(const char *Name)
 :cRemote(Name)
 ,cThread("USBKBD remote control")
 {
-  Connect();
   Start();
 }
 
 cUsbkbdRemote::~cUsbkbdRemote()
 {
-  Cancel();
-  //ioctl(fd, EVIOCGRAB, 0);
-  if (fd >= 0)
-     close(fd);
-  fd = -1;
-}
-
-bool cUsbkbdRemote::Connect()
-{
-  fd = open(usbkbd_device, O_RDONLY);
-  if(fd == -1){
-    if(DEBUG) printf("Cannot open %s. %s.\n", usbkbd_device, strerror(errno));
-    esyslog("Cannot open %s. %s.\n", usbkbd_device, strerror(errno));
-    return false;
-  } else {
-    if(DEBUG) printf("opened %s\n", usbkbd_device);
-    isyslog("usbkbd: opened %s\n", usbkbd_device);
-  }
-
-  /*if(ioctl(fd, EVIOCGRAB, 1)){
-    if(DEBUG) printf("Cannot grab %s. %s.\n", kbd_device, strerror(errno));
-  } else {
-    if(DEBUG) printf("Grabbed %s!\n", kbd_device);
-  }*/
-
-  return true;
+  Cancel(3);
 }
 
 bool cUsbkbdRemote::Ready(void)
 {
+  cCondWait::SleepMs(3); // wait a little after reconnect
   return fd >= 0;
 }
 
@@ -90,7 +62,7 @@ void cUsbkbdRemote::Action(void)
   if(DEBUG) printf("UsbkbdRemote action!\n");
 
   while(Running()){
-    if (read(fd, &event, sizeof(event)) != -1 && (event.type == EV_KEY)) {
+    if (Ready() && read(fd, &event, sizeof(event)) != -1 && (event.type == EV_KEY)) {
 
         key = cString::sprintf("%s", evkeys[event.code]);
 
@@ -147,6 +119,76 @@ void cUsbkbdRemote::Action(void)
   }
 }
 
+class cConnect : public cThread {
+private:
+  bool Connect(void);
+  void Action(void);
+protected:
+public:
+  cConnect();
+  ~cConnect();
+};
+
+cConnect::cConnect(void)
+{
+  Connect();
+  Start();
+}
+
+cConnect::~cConnect()
+{
+  Cancel();
+  //ioctl(fd, EVIOCGRAB, 0);
+  if (fd >= 0)
+     close(fd);
+  fd = -1;
+}
+
+bool cConnect::Connect()
+{
+  fd = open(usbkbd_device, O_RDONLY);
+  if(fd == -1){
+    if(DEBUG) printf("Cannot open %s. %s.\n", usbkbd_device, strerror(errno));
+    esyslog("Cannot open %s. %s.\n", usbkbd_device, strerror(errno));
+    return false;
+  } else {
+    if(DEBUG) printf("opened %s\n", usbkbd_device);
+    isyslog("usbkbd: opened %s\n", usbkbd_device);
+  }
+
+  /*if(ioctl(fd, EVIOCGRAB, 1)){
+    if(DEBUG) printf("Cannot grab %s. %s.\n", usbkbd_device, strerror(errno));
+  } else {
+    if(DEBUG) printf("Grabbed %s!\n", usbkbd_device);
+  }*/
+
+  return true;
+}
+
+
+void cConnect::Action(void)
+{
+  if(DEBUG) printf("Connect action!\n");
+
+  while(Running()){
+    if (access(usbkbd_device, F_OK) == -1) {
+        esyslog("no usbkbd connection, trying to reconnect every %.1f seconds", float(RECONNECTDELAY) / 1000);
+        if(DEBUG) printf("no usbkbd connection, trying to reconnect every %.1f seconds\n", float(RECONNECTDELAY) / 1000);
+        //ioctl(fd, EVIOCGRAB, 0);
+        if (fd >= 0) {
+            close(fd);
+            fd = -1;
+        }
+    } else if (fd == -1) {
+        if (Connect()) {
+            isyslog("reconnected to usbkbd");
+            if(DEBUG) printf("reconnected to usbkbd\n");
+        }
+    }
+    cCondWait::SleepMs(RECONNECTDELAY);
+  }
+}
+
 class cPluginUsbkbd : public cPlugin {
 public:
   cPluginUsbkbd(void);
@@ -182,6 +224,7 @@ bool cPluginUsbkbd::ProcessArgs(int argc, char *argv[])
 bool cPluginUsbkbd::Start(void)
 {
   new cUsbkbdRemote("USBKBD");
+  new cConnect();
   return true;
 }
 
