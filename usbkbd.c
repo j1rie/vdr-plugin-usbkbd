@@ -13,7 +13,7 @@
 #include <linux/input.h>
 #include <locale.h>
 
-static const char *VERSION        = "0.0.3";
+static const char *VERSION        = "0.0.4";
 static const char *DESCRIPTION    = tr("Send keypresses from USB keyboard to VDR");
 
 #define DEBUG 1
@@ -103,7 +103,7 @@ void cUsbkbdRemote::Action(void)
         if (Connect()) {
             isyslog("reconnected to usbkbd");
             if(DEBUG) printf("reconnected to usbkbd\n");
-            cCondWait::SleepMs(3); // wait a little after reconnect
+            //cCondWait::SleepMs(3); // wait a little after reconnect
         }
     }
 
