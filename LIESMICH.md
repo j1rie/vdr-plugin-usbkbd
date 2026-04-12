@@ -12,3 +12,5 @@ Der einfachste Weg, Tastenbelegungen in remote.conf zu erstellen, ist die Verwen
 
 Man überprüft die IDs der Tastatur mit lsusb, passt die 70-usbkbd.rules entsprechend an und legt sie in das udev-Verzeichnis.  
 Dann muss man dem Plugin das Tastatur-Event-Gerät nicht als Parameter übergeben.
+
+Die Tastatur kann beliebig an- und abgesteckt werden.
