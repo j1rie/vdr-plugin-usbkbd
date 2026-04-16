@@ -13,7 +13,7 @@
 #include <linux/input.h>
 #include <locale.h>
 
-static const char *VERSION        = "0.0.4";
+static const char *VERSION        = "0.0.5";
 static const char *DESCRIPTION    = tr("Send keypresses from USB keyboard to VDR");
 
 #define DEBUG 1
@@ -55,7 +55,7 @@ bool cUsbkbdRemote::Connect()
   fd = open(usbkbd_device, O_RDONLY);
   if(fd == -1){
     if(DEBUG) printf("Cannot open %s. %s.\n", usbkbd_device, strerror(errno));
-    esyslog("Cannot open %s. %s.\n", usbkbd_device, strerror(errno));
+    esyslog("usbkbd: Cannot open %s. %s.\n", usbkbd_device, strerror(errno));
     return false;
   } else {
     if(DEBUG) printf("opened %s\n", usbkbd_device);
@@ -63,9 +63,9 @@ bool cUsbkbdRemote::Connect()
   }
 
   /*if(ioctl(fd, EVIOCGRAB, 1)){
-    if(DEBUG) printf("Cannot grab %s. %s.\n", kbd_device, strerror(errno));
+    if(DEBUG) printf("Cannot grab %s. %s.\n", usbkbd_device, strerror(errno));
   } else {
-    if(DEBUG) printf("Grabbed %s!\n", kbd_device);
+    if(DEBUG) printf("Grabbed %s!\n", usbkbd_device);
   }*/
 
   return true;
@@ -89,8 +89,8 @@ void cUsbkbdRemote::Action(void)
 
   while(Running()){
     while (access(usbkbd_device, F_OK) == -1) {
-      esyslog("no usbkbd connection, trying to reconnect every %.1f seconds", float(RECONNECTDELAY) / 1000);
-      if(DEBUG) printf("no usbkbd connection, trying to reconnect every %.1f seconds\n", float(RECONNECTDELAY) / 1000);
+      //esyslog("usbkbd: no connection to %s, trying to reconnect every %.1f seconds", usbkbd_device, float(RECONNECTDELAY) / 1000);
+      if(DEBUG) printf("no connection to %s, trying to reconnect every %.1f seconds\n", usbkbd_device, float(RECONNECTDELAY) / 1000);
       //ioctl(fd, EVIOCGRAB, 0);
       if (fd >= 0) {
         close(fd);
@@ -101,8 +101,8 @@ void cUsbkbdRemote::Action(void)
 
     if (fd == -1) {
         if (Connect()) {
-            isyslog("reconnected to usbkbd");
-            if(DEBUG) printf("reconnected to usbkbd\n");
+            isyslog("usbkbd: reconnected to %s", usbkbd_device);
+            if(DEBUG) printf("reconnected to %s\n", usbkbd_device);
             //cCondWait::SleepMs(3); // wait a little after reconnect
         }
     }
@@ -185,7 +185,7 @@ cPluginUsbkbd::~cPluginUsbkbd()
 
 const char *cPluginUsbkbd::CommandLineHelp(void)
 {
-  return "  usbkbd event (/dev/input/event... )\n"
+  return "  usbkbd event (/dev/input/eventX)\n"
          "  default /dev/usbkbd_event\n";
 }
 
