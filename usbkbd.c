@@ -13,7 +13,7 @@
 #include <linux/input.h>
 #include <locale.h>
 
-static const char *VERSION        = "0.0.5";
+static const char *VERSION        = "0.0.6";
 static const char *DESCRIPTION    = tr("Send keypresses from USB keyboard to VDR");
 
 #define DEBUG 1
@@ -84,13 +84,17 @@ void cUsbkbdRemote::Action(void)
   bool repeat = false;
   cString key = "";
   cString lastkey = "";
+  bool connected = true;
 
   if(DEBUG) printf("UsbkbdRemote action!\n");
 
-  while(Running()){
+  while(Running()) {
     while (access(usbkbd_device, F_OK) == -1) {
-      //esyslog("usbkbd: no connection to %s, trying to reconnect every %.1f seconds", usbkbd_device, float(RECONNECTDELAY) / 1000);
-      if(DEBUG) printf("no connection to %s, trying to reconnect every %.1f seconds\n", usbkbd_device, float(RECONNECTDELAY) / 1000);
+      if (connected) {
+          connected = false;
+          esyslog("usbkbd: no connection to %s, trying to reconnect every %.1f seconds", usbkbd_device, float(RECONNECTDELAY) / 1000);
+          if(DEBUG) printf("no connection to %s, trying to reconnect every %.1f seconds\n", usbkbd_device, float(RECONNECTDELAY) / 1000);
+      }
       //ioctl(fd, EVIOCGRAB, 0);
       if (fd >= 0) {
         close(fd);
@@ -101,6 +105,8 @@ void cUsbkbdRemote::Action(void)
 
     if (fd == -1) {
         if (Connect()) {
+            if (!connected)
+                connected = true;
             isyslog("usbkbd: reconnected to %s", usbkbd_device);
             if(DEBUG) printf("reconnected to %s\n", usbkbd_device);
             //cCondWait::SleepMs(3); // wait a little after reconnect

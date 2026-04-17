@@ -7,6 +7,7 @@ Projekt-Homepage:                 https://github.com/j1rie/vdr-plugin-usbkbd
 Aktuelle Version verfügbar unter: https://github.com/j1rie/vdr-plugin-usbkbd
 
 ## Beschreibung: Das Plugin usbkbd leitet Tastendrücke von einer USB-Tastatur an den VDR weiter. Auch wenn X aktiv ist.
+Es funktioniert auch für alle Eingabe Geräte, die Tastendrücke senden.
 
 Der einfachste Weg, Tastenbelegungen in remote.conf zu erstellen, ist die Verwendung des Anlernprozesses von VDR.
 
