@@ -21,3 +21,7 @@ The keyboard can be connected or disconnected as you like.
 Find the IDs with udevadm info --query=all --attribute-walk --name=/dev/input/eventX
 
 ## uinput device (untestet, should work too)
+
+## turn it off and on
+svdrpsend REMO off  
+svdrpsend REMO on

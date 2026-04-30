@@ -21,3 +21,7 @@ Die Tastatur kann beliebig an- und abgesteckt werden.
 Die IDs werden mit udevadm info --query=all --attribute-walk --name=/dev/input/eventX gefunden.
 
 ## uinput Gerät (ungetestet, sollte auch gehen)
+
+## aus- und anstellen
+svdrpsend REMO off  
+svdrpsend REMO on
