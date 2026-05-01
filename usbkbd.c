@@ -12,9 +12,8 @@
 #include "input-event-codes.h"
 #include <linux/input.h>
 #include <locale.h>
-#include <ctype.h>
 
-static const char *VERSION        = "0.0.7";
+static const char *VERSION        = "0.0.8";
 static const char *DESCRIPTION    = tr("Send keypresses from USB keyboard to VDR");
 
 #define DEBUG 1
@@ -152,8 +151,8 @@ void cUsbkbdRemote::Action(void)
             LastTime.Set();
             if (DEBUG) printf("put %s %s\n", (const char*)key, repeat ? "Repeat" : "");
             Put(key, repeat);
-            if (strlen(key) == 5) {// only one letter after "KEY_"
-                char insert_char = tolower(key[4]); // remove "KEY_" and lower case
+            if (strlen(key) == 5 && key[4] > 0x40 && key[4] < 0x5B) {// only one letter A...Z after "KEY_"
+                char insert_char = key[4] | 0x20; // convert to lower case a...z
                 if (DEBUG) printf("insert_char: ---%c---\n", insert_char);
                 Put((eKeys)(kKbd|insert_char<<16));
             }

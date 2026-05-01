@@ -28,4 +28,4 @@ svdrpsend REMO on
 
 ## VDR's Text Input Mode
 You can enter letters and numbers, use the color buttons, and navigate as usual.  
-TODO: Numbers do not work properly.
+In settings OSD "Number keys for characters" needs to be disabled.
