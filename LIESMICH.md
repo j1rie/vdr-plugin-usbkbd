@@ -25,3 +25,7 @@ Die IDs werden mit udevadm info --query=all --attribute-walk --name=/dev/input/e
 ## aus- und anstellen
 svdrpsend REMO off  
 svdrpsend REMO on
+
+## VDR's Texteingabe Modus
+Man kann Buchstaben und Zahlen eingeben, die Farbtasten benutzen und wie gewohnt navigieren.  
+TODO: Zahlen funktionieren nicht richtig.

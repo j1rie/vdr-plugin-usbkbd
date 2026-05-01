@@ -152,9 +152,11 @@ void cUsbkbdRemote::Action(void)
             LastTime.Set();
             if (DEBUG) printf("put %s %s\n", (const char*)key, repeat ? "Repeat" : "");
             Put(key, repeat);
-            char insert_char = tolower(key[4]); // remove "KEY_" and lower case
-            if (DEBUG) printf("insert_char: %c\n", insert_char);
-            Put((eKeys)(kKbd|insert_char<<16));
+            if (strlen(key) == 5) {// only one letter after "KEY_"
+                char insert_char = tolower(key[4]); // remove "KEY_" and lower case
+                if (DEBUG) printf("insert_char: ---%c---\n", insert_char);
+                Put((eKeys)(kKbd|insert_char<<16));
+            }
         }
 
         if (event.value == 0) { // release

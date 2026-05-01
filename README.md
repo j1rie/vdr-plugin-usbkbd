@@ -25,3 +25,7 @@ Find the IDs with udevadm info --query=all --attribute-walk --name=/dev/input/ev
 ## turn it off and on
 svdrpsend REMO off  
 svdrpsend REMO on
+
+## VDR's Text Input Mode
+You can enter letters and numbers, use the color buttons, and navigate as usual.  
+TODO: Numbers do not work properly.
