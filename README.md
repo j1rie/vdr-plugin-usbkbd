@@ -29,3 +29,6 @@ svdrpsend REMO on
 ## VDR's Text Input Mode
 You can enter letters and numbers, use the color buttons, and navigate as usual.  
 In settings OSD "Number keys for characters" needs to be disabled.
+
+## xineliboutput
+In setup.conf set xineliboutput.X11.UseKeyboard = 0
