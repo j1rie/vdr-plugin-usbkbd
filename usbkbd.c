@@ -13,7 +13,7 @@
 #include <linux/input.h>
 #include <locale.h>
 
-static const char *VERSION        = "0.0.8";
+static const char *VERSION        = "0.0.9";
 static const char *DESCRIPTION    = tr("Send keypresses from USB keyboard to VDR");
 
 #define DEBUG 1
@@ -26,6 +26,7 @@ private:
   bool Connect(void);
   void Action(void);
   bool Ready();
+  void InsertChar(char c);
   int fd;
   struct input_event event;
 public:
@@ -75,6 +76,14 @@ bool cUsbkbdRemote::Ready(void)
 {
   return fd >= 0;
 }
+
+void cUsbkbdRemote::InsertChar(char c)
+{
+  c = c | 0x20; // convert to lower case a...z
+  if (DEBUG) printf("insert_char: ---%c---\n", c);
+  Put((eKeys)(kKbd|c<<16));
+}
+
 
 void cUsbkbdRemote::Action(void)
 {
@@ -151,11 +160,11 @@ void cUsbkbdRemote::Action(void)
             LastTime.Set();
             if (DEBUG) printf("put %s %s\n", (const char*)key, repeat ? "Repeat" : "");
             Put(key, repeat);
-            if (strlen(key) == 5 && key[4] > 0x40 && key[4] < 0x5B) {// only one letter A...Z after "KEY_"
-                char insert_char = key[4] | 0x20; // convert to lower case a...z
-                if (DEBUG) printf("insert_char: ---%c---\n", insert_char);
-                Put((eKeys)(kKbd|insert_char<<16));
-            }
+            // for edit mode
+            if (strlen(key) == 5 && key[4] > 0x40 && key[4] < 0x5B) // only one letter A...Z after "KEY_"
+                InsertChar(key[4]);
+            if (!strcmp(evkeys[event.code], "KEY_SPACE"))
+                InsertChar(0x20);
         }
 
         if (event.value == 0) { // release
