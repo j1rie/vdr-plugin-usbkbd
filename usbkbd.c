@@ -13,8 +13,8 @@
 #include <linux/input.h>
 #include <locale.h>
 
-static const char *VERSION        = "0.1.0";
-static const char *DESCRIPTION    = tr("Send keypresses from USB keyboard to VDR");
+static const char *VERSION        = "0.1.1";
+static const char *DESCRIPTION    = tr("Send keypresses from an USB keyboard to VDR");
 
 #define DEBUG 1
 #define RECONNECTDELAY 3000 // ms
@@ -80,6 +80,16 @@ bool cUsbkbdRemote::Ready(void)
 
 void cUsbkbdRemote::InsertChar(char c)
 {
+  if (!strcmp("deu,ger", I18nLanguageCode(I18nCurrentLanguage()))) {
+    if (c == 'Z') {
+      c = 'Y';
+      if(DEBUG) printf("converted Z -> Y\n");
+    }
+    else if (c == 'Y') {
+      c = 'Z';
+      if(DEBUG) printf("converted Y -> Z\n");
+    }
+  }
   if (!shift)
     c = c | 0x20; // convert to lower case a...z
   if (DEBUG) printf("insert_char: ---%c---\n", c);
@@ -98,6 +108,7 @@ void cUsbkbdRemote::Action(void)
   shift = false;
 
   if(DEBUG) printf("UsbkbdRemote action!\n");
+  //if(DEBUG) printf("language: %s\n", I18nLanguageCode(I18nCurrentLanguage()));
 
   while(Running()) {
     while (access(usbkbd_device, F_OK) == -1) {
