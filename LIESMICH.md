@@ -28,7 +28,7 @@ svdrpsend REMO on
 
 ## VDR's Texteingabe Modus
 Man kann Buchstaben und Zahlen eingeben, die Farbtasten benutzen und wie gewohnt navigieren.  
-In den Einstellungen für OSD muss "Zifferntasten für Zeichen" aus sein.
+In den Einstellungen für OSD muss "Zifferntasten für Zeichen" aus sein. Sonst verhalten sich die Zifferntasten wie bei einer Fernbedienung und produzieren bei mehrfachem Drücken Buchstaben und Zahlen im Kreis herum.
 
 ## xineliboutput
 In der setup.conf sollte xineliboutput.X11.UseKeyboard = 0 sein.  
