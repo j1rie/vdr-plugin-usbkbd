@@ -31,5 +31,5 @@ You can enter letters and numbers, use the color buttons, and navigate as usual.
 In settings OSD "Number keys for characters" needs to be disabled.
 
 ## xineliboutput
-In setup.conf set xineliboutput.X11.UseKeyboard = 0
+In setup.conf set xineliboutput.X11.UseKeyboard = 0  
 vdr-sxfe needs to be started with -x.

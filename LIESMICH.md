@@ -31,5 +31,5 @@ Man kann Buchstaben und Zahlen eingeben, die Farbtasten benutzen und wie gewohnt
 In den Einstellungen für OSD muss "Zifferntasten für Zeichen" aus sein.
 
 ## xineliboutput
-In der setup.conf sollte xineliboutput.X11.UseKeyboard = 0 sein.
+In der setup.conf sollte xineliboutput.X11.UseKeyboard = 0 sein.  
 vdr-sxfe muss mit -x gestartet werden.
