@@ -172,14 +172,27 @@ void cUsbkbdRemote::Action(void)
             if(DEBUG) printf("delta send: %ld\n", LastTime.Elapsed());
             LastTime.Set();
             if (DEBUG) printf("put %s %s\n", (const char*)key, repeat ? "Repeat" : "");
-            Put(key, repeat);
-            // for edit mode
-            if (!strcmp(evkeys[event.code], "KEY_LEFTSHIFT") || !strcmp(evkeys[event.code], "KEY_RIGHTSHIFT"))
-                shift = true;
-            if (strlen(key) == 5 && key[4] > 0x40 && key[4] < 0x5B) // only one letter A...Z after "KEY_"
-                InsertChar(key[4]);
-            if (!strcmp(evkeys[event.code], "KEY_SPACE"))
-                InsertChar(0x20);
+            if (InEditMode()) {
+                if (!strcmp(evkeys[event.code], "KEY_LEFTSHIFT") || !strcmp(evkeys[event.code], "KEY_RIGHTSHIFT"))
+                    shift = true;
+                if (strlen(key) == 5 && key[4] > 0x40 && key[4] < 0x5B) // only one letter A...Z after "KEY_"
+                    InsertChar(key[4]);
+                if (strlen(key) == 5 && key[4] >= 0x30 && key[4] <= 0x39) // only one digit 0...9 after "KEY_"
+                    InsertChar(key[4]);
+                if (!strcmp(evkeys[event.code], "KEY_SPACE"))
+                    InsertChar(0x20);
+                if (!strcmp(evkeys[event.code], "KEY_BACKSPACE") ||
+                    !strcmp(evkeys[event.code], "KEY_ENTER")     ||
+                    !strcmp(evkeys[event.code], "KEY_F1")        ||
+                    !strcmp(evkeys[event.code], "KEY_F2")        ||
+                    !strcmp(evkeys[event.code], "KEY_F3")        ||
+                    !strcmp(evkeys[event.code], "KEY_F4")        ||
+                    !strcmp(evkeys[event.code], "KEY_LEFT")      ||
+                    !strcmp(evkeys[event.code], "KEY_RIGHT"))
+                    Put(key, repeat);
+            } else {
+                Put(key, repeat);
+            }
         }
 
         if (event.value == 0) { // release
