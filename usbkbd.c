@@ -175,20 +175,16 @@ void cUsbkbdRemote::Action(void)
             if (InEditMode()) {
                 if (!strcmp(evkeys[event.code], "KEY_LEFTSHIFT") || !strcmp(evkeys[event.code], "KEY_RIGHTSHIFT"))
                     shift = true;
-                if (strlen(key) == 5 && key[4] > 0x40 && key[4] < 0x5B) // only one letter A...Z after "KEY_"
+                else if (strlen(key) == 5 && key[4] > 0x40 && key[4] < 0x5B) // only one letter A...Z after "KEY_"
                     InsertChar(key[4]);
-                if (strlen(key) == 5 && key[4] >= 0x30 && key[4] <= 0x39) // only one digit 0...9 after "KEY_"
-                    InsertChar(key[4]);
-                if (!strcmp(evkeys[event.code], "KEY_SPACE"))
+                else if (strlen(key) == 5 && key[4] >= 0x30 && key[4] <= 0x39) // only one digit 0...9 after "KEY_"
+                    if (Setup.NumberKeysForChars)
+                        Put(key, repeat);
+                    else
+                        InsertChar(key[4]);
+                else if (!strcmp(evkeys[event.code], "KEY_SPACE"))
                     InsertChar(0x20);
-                if (!strcmp(evkeys[event.code], "KEY_BACKSPACE") ||
-                    !strcmp(evkeys[event.code], "KEY_ENTER")     ||
-                    !strcmp(evkeys[event.code], "KEY_F1")        ||
-                    !strcmp(evkeys[event.code], "KEY_F2")        ||
-                    !strcmp(evkeys[event.code], "KEY_F3")        ||
-                    !strcmp(evkeys[event.code], "KEY_F4")        ||
-                    !strcmp(evkeys[event.code], "KEY_LEFT")      ||
-                    !strcmp(evkeys[event.code], "KEY_RIGHT"))
+                else
                     Put(key, repeat);
             } else {
                 Put(key, repeat);
