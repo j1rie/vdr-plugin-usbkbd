@@ -9,7 +9,6 @@
 #include <vdr/i18n.h>
 #include <vdr/remote.h>
 #include <vdr/thread.h>
-#include "input-event-codes.h"
 #include <linux/input.h>
 #include <locale.h>
 #include <xkbcommon/xkbcommon.h>
@@ -29,6 +28,7 @@ private:
   bool Ready();
   int fd;
   struct input_event event;
+  void Abort(void);
 public:
   cUsbkbdRemote(const char *Name);
   ~cUsbkbdRemote();
@@ -44,11 +44,7 @@ cUsbkbdRemote::cUsbkbdRemote(const char *Name)
 
 cUsbkbdRemote::~cUsbkbdRemote()
 {
-  Cancel();
-  //ioctl(fd, EVIOCGRAB, 0);
-  if (fd >= 0)
-     close(fd);
-  fd = -1;
+  Abort();
 }
 
 bool cUsbkbdRemote::Connect()
@@ -75,6 +71,15 @@ bool cUsbkbdRemote::Connect()
 bool cUsbkbdRemote::Ready(void)
 {
   return fd >= 0;
+}
+
+void cUsbkbdRemote::Abort(void)
+{
+  Cancel();
+  //ioctl(fd, EVIOCGRAB, 0);
+  if (fd >= 0)
+     close(fd);
+  fd = -1;
 }
 
 void cUsbkbdRemote::Action(void)
@@ -140,6 +145,7 @@ void cUsbkbdRemote::Action(void)
   if (!state) {
     esyslog("usbkbd: Cannot create state\n");
     if (DEBUG) printf("usbkbd: Cannot create state\n");
+    Abort();
     }
 
   if (DEBUG) printf("UsbkbdRemote action!\n");
@@ -173,13 +179,12 @@ void cUsbkbdRemote::Action(void)
 
         char buffer[64];
         xkb_keycode_t keycode = event.code + 8;
-        if (state) {
-            if (event.value != 2)
-                xkb_state_update_key(state, keycode, event.value ? XKB_KEY_DOWN : XKB_KEY_UP);
-            xkb_keysym_get_name(xkb_state_key_get_one_sym(state, keycode), buffer, sizeof(buffer));
-            key = buffer;
-            str_len = xkb_state_key_get_utf8(state, keycode, str, sizeof(str));
-        }
+        if (event.value != 2)
+            xkb_state_update_key(state, keycode, event.value ? XKB_KEY_DOWN : XKB_KEY_UP);
+        xkb_keysym_t sym = xkb_state_key_get_one_sym(state, keycode);
+        xkb_keysym_get_name(sym, buffer, sizeof(buffer));
+        key = buffer;
+        str_len = xkb_state_key_get_utf8(state, keycode, str, sizeof(str));
 
         int Delta = ThisTime.Elapsed(); // the time between two consecutive events
         if (DEBUG) printf("Delta: %d\n", Delta);
@@ -216,11 +221,14 @@ void cUsbkbdRemote::Action(void)
             LastTime.Set();
             if (DEBUG) printf("put %s %s\n", (const char*)key, repeat ? "Repeat" : "");
 
-            if (!InEditMode() || !state) {
+            if (!InEditMode()) {
                 Put(key, repeat);
             } else {
                 if (str_len > 0 && (unsigned char)str[0] >= 0x20 && (unsigned char)str[0] != 0x7F)
+                    if (str_len == 1)
                         Put((eKeys)(kKbd|str[0]<<16));
+                    else
+                        Put((eKeys)(kKbd|sym<<16));
                 else
                     Put(key, repeat); // control must work in edit mode, too, F1,F2,F3,F4 have str_len 0, Backspace and Return are below 0x20
             }
