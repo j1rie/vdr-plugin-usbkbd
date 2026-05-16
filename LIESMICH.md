@@ -27,9 +27,25 @@ svdrpsend REMO off
 svdrpsend REMO on
 
 ## VDR's Texteingabe Modus
-Man kann Buchstaben und Zahlen eingeben, die Farbtasten benutzen und wie gewohnt navigieren.  
-In den Einstellungen für OSD muss "Zifferntasten für Zeichen" aus sein. Sonst verhalten sich die Zifferntasten wie bei einer Fernbedienung und produzieren bei mehrfachem Drücken Buchstaben und Zahlen im Kreis herum.
+Man kann Buchstaben und Zahlen eingeben, die Farbtasten benutzen und wie gewohnt navigieren.
+
+## Tastatur Layout
+Das Tastaturlayout wird aus der VDR Sprache abgeleitet. Alternativ kann es über Umgebungsvariablen gesteuert.
+
+So können z.B. die Systemweiten Einstellungen vom Xserver übernommen werden:
+```
+eval $(LC_ALL=C localectl status | awk -F': ' '/X11 Layout/ {print "export XKB_DEFAULT_LAYOUT=" $2} /X11 Model/ {print "export XKB_DEFAULT_MODEL=" $2} /X11 Variant/ {print "export XKB_DEFAULT_VARIANT=" $2} /X11 Options/ {print "export XKB_DEFAULT_OPTIONS=" $2}')
+```
 
 ## xineliboutput
 In der setup.conf sollte xineliboutput.X11.UseKeyboard = 0 sein.  
 vdr-sxfe muss mit -x gestartet werden.
+
+## Argumente
+Beim Start können dise Argumente angegeben werden:
+
+- `-d` oder `--device` Gibt an von welchem Input Device (/dev/input/eventX) gelesen werden soll. Der Vorgabewert ist `/dev/usbkbd_event`.
+- `-l` oder `letterdetection` Aktiviert die automatische Erkennung von Texteingabe per Tastatur. Sobald dies erkannt wurde (dadurch das eine Buchstabentaste gedrückt wurde), erzeugen die Zifferntasten nicht mehr Buchstaben (wie sie für die Texteingabe per Fernbedienung benötigt werden), sondern nur Ziffern. Dies bewirkt, dass per Fernbedienung wie gewohnt Buchstaben über die Zifferntasten eingegeben werden können, per Tastatur die Zifferntasten jedoch für die Zifferneingabe verwendet werden können.
+- `-k` oder `keypadnumbers` Aktiviert das umwandeln von Keyped Ziffern in Ziffern zur Buchstaben Eingabe. Dadurch werden bei der Texteingabe die Ziffern der Tastatur immer zur Eingabe von Ziffern verwendet, und die Ziffern der Fernbedienung zur Eingabe von Buchstaben. Hierfür muss die Fernbedienung so angelernt werden, dass die Ziffern Tasten KEY_KP0 bis KEY_KP9 Events senden, und beim Anlernen des VDR die normalen Ziffern der Tastatur.
+
+Wird weder die Option `-l` noch `-k` verwendet, kann über die VDR OSD Einstellungen "Zifferntasten für Zeichen" aus geschaltet werden. Ansonsten verhalten sich die Zifferntasten einer Tastatur wie bei einer Fernbedienung und produzieren bei mehrfachem Drücken Buchstaben und Zahlen im Kreis herum.

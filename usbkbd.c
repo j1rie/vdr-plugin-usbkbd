@@ -9,27 +9,28 @@
 #include <vdr/i18n.h>
 #include <vdr/remote.h>
 #include <vdr/thread.h>
-#include "input-event-codes.h"
 #include <linux/input.h>
 #include <locale.h>
+#include <getopt.h>
+#include <xkbcommon/xkbcommon.h>
 
 static const char *VERSION        = "0.1.2";
 static const char *DESCRIPTION    = tr("Send keypresses from an USB keyboard to VDR");
 
-#define DEBUG 1
+#define DEBUG 0
 #define RECONNECTDELAY 3000 // ms
 
 const char* usbkbd_device = "/dev/usbkbd_event";
+bool letter_detect = false;
+bool keypad_numbers = false;
 
 class cUsbkbdRemote : public cRemote, private cThread {
 private:
   bool Connect(void);
   void Action(void);
   bool Ready();
-  void InsertChar(char c);
   int fd;
   struct input_event event;
-  bool shift;
 public:
   cUsbkbdRemote(const char *Name);
   ~cUsbkbdRemote();
@@ -78,24 +79,6 @@ bool cUsbkbdRemote::Ready(void)
   return fd >= 0;
 }
 
-void cUsbkbdRemote::InsertChar(char c)
-{
-  if (!strcmp("deu,ger", I18nLanguageCode(I18nCurrentLanguage()))) {
-    if (c == 'Z') {
-      c = 'Y';
-      if(DEBUG) printf("converted Z -> Y\n");
-    }
-    else if (c == 'Y') {
-      c = 'Z';
-      if(DEBUG) printf("converted Y -> Z\n");
-    }
-  }
-  if (!shift)
-    c = c | 0x20; // convert to lower case a...z
-  if (DEBUG) printf("insert_char: ---%c---\n", c);
-  Put((eKeys)(kKbd|c<<16));
-}
-
 void cUsbkbdRemote::Action(void)
 {
   cTimeMs FirstTime;
@@ -105,10 +88,50 @@ void cUsbkbdRemote::Action(void)
   cString key = "";
   cString lastkey = "";
   bool connected = true;
-  shift = false;
+  bool letter = false;
+
+  struct xkb_keymap *keymap = NULL;
+  struct xkb_state *state = NULL;
+  struct xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+  struct xkb_rule_names names = {
+    .rules = getenv("XKB_DEFAULT_RULES"),
+    .model = getenv("XKB_DEFAULT_MODEL"),
+    .layout = getenv("XKB_DEFAULT_LAYOUT"),
+    .variant = getenv("XKB_DEFAULT_VARIANT"),
+    .options = getenv("XKB_DEFAULT_OPTIONS")
+  };
+  if (names.layout && *names.layout) {
+      keymap = xkb_keymap_new_from_names(ctx, &names, XKB_KEYMAP_COMPILE_NO_FLAGS);
+      if (!keymap)
+        esyslog("usbkbd: Wrong XKB_DEFAULT_* environment variables\n");
+  }
+  if (!keymap) {
+      names.rules = NULL;
+      names.model = NULL;
+      names.variant = NULL;
+      const char* locale = I18nLocale(I18nCurrentLanguage());
+      char vdr_lang[3] = {0};
+      if (locale && strlen(locale) >= 2) {
+          vdr_lang[0] = locale[0];
+          vdr_lang[1] = locale[1];
+          names.layout = vdr_lang;
+          keymap = xkb_keymap_new_from_names(ctx, &names, XKB_KEYMAP_COMPILE_NO_FLAGS);
+          if (keymap)
+            isyslog("usbkbd: Fall back to vdr locale '%s' for keymap selection\n", vdr_lang);
+      }
+      if (!keymap) {
+          names.layout = "us";
+          keymap = xkb_keymap_new_from_names(ctx, &names, XKB_KEYMAP_COMPILE_NO_FLAGS);
+          if (keymap)
+            isyslog("usbkbd: Fall back to 'us' keymap\n");
+      }
+  }
+  if (!keymap)
+      esyslog("usbkbd: Cannot create keymap\n");
+  else
+      state = xkb_state_new(keymap);
 
   if(DEBUG) printf("UsbkbdRemote action!\n");
-  //if(DEBUG) printf("language: %s\n", I18nLanguageCode(I18nCurrentLanguage()));
 
   while(Running()) {
     while (access(usbkbd_device, F_OK) == -1) {
@@ -137,7 +160,14 @@ void cUsbkbdRemote::Action(void)
 
     if (Ready() && read(fd, &event, sizeof(event)) != -1 && (event.type == EV_KEY)) {
 
-        key = cString::sprintf("%s", evkeys[event.code]);
+        char buffer[64];
+        xkb_keycode_t xkb_code = event.code + 8;
+        if (state) {
+          if (event.value != 2)
+            xkb_state_update_key(state, xkb_code, event.value ? XKB_KEY_DOWN : XKB_KEY_UP);
+          xkb_keysym_get_name(xkb_state_key_get_one_sym(state, xkb_code), buffer, sizeof(buffer));
+          key = buffer;
+        }
 
         int Delta = ThisTime.Elapsed(); // the time between two consecutive events
         if (DEBUG) printf("Delta: %d\n", Delta);
@@ -169,25 +199,42 @@ void cUsbkbdRemote::Action(void)
 
         /* send key */
         if (event.value == 1 || event.value == 2) {
+            char str[16];
+            int str_len = xkb_state_key_get_utf8(state, xkb_code, str, sizeof(str));
             if(DEBUG) printf("delta send: %ld\n", LastTime.Elapsed());
             LastTime.Set();
             if (DEBUG) printf("put %s %s\n", (const char*)key, repeat ? "Repeat" : "");
-            if (InEditMode()) {
-                if (!strcmp(evkeys[event.code], "KEY_LEFTSHIFT") || !strcmp(evkeys[event.code], "KEY_RIGHTSHIFT"))
-                    shift = true;
-                else if (strlen(key) == 5 && key[4] > 0x40 && key[4] < 0x5B) // only one letter A...Z after "KEY_"
-                    InsertChar(key[4]);
-                else if (strlen(key) == 5 && key[4] >= 0x30 && key[4] <= 0x39) // only one digit 0...9 after "KEY_"
-                    if (Setup.NumberKeysForChars)
-                        Put(key, repeat);
-                    else
-                        InsertChar(key[4]);
-                else if (!strcmp(evkeys[event.code], "KEY_SPACE"))
-                    InsertChar(0x20);
+            if (InEditMode() && state) {
+                if (str_len > 0 && ((unsigned char)str[0]) >= 32 && ((unsigned char)str[0]) != 127) {
+                    if (DEBUG) printf("Zeichen: %s %d, Name: %s, keypad_numbers: %d, letter_detect: %d, letter: %d\n", str, (unsigned char)str[0], (const char*)key, keypad_numbers, letter_detect, letter);
+                    if (str[0] >= '0' && str[0] <= '9' &&
+                        ((keypad_numbers && strncmp(key, "KP_", 3) == 0) || 
+                         (!keypad_numbers && strncmp(key, "KP_", 3) != 0 && (!letter || !letter_detect))))
+                        Put(str, repeat);
+                    else {
+                        letter = true;
+                        if (str_len == 1)
+                            Put((eKeys)(kKbd|str[0]<<16));
+                        else if (str_len == 2) {
+                            xkb_keysym_t sym = xkb_state_key_get_one_sym(state, xkb_code);
+                            Put((eKeys)(kKbd|sym << 16));
+                        }
+                    }
+                }
+                else {
+                    if (strcmp(key, "Left")   &&
+                        strcmp(key, "Right")  &&
+                        strcmp(key, "Delete") &&
+                        strcmp(key, "Insert"))
+                        letter = false;
+                    Put(key, repeat);
+                }
+            } else {
+                letter = false;
+                if (keypad_numbers && strncmp(key, "KP_", 3) == 0 && str[0] >= '0' && str[0] <= '9')
+                    Put(str, repeat);
                 else
                     Put(key, repeat);
-            } else {
-                Put(key, repeat);
             }
         }
 
@@ -202,8 +249,6 @@ void cUsbkbdRemote::Action(void)
                 repeat = false;
             }
             lastkey = "";
-            if (!strcmp(evkeys[event.code], "KEY_LEFTSHIFT") || !strcmp(evkeys[event.code], "KEY_RIGHTSHIFT"))
-                shift = false;
         }
         if (DEBUG) printf("\n");
     }
@@ -231,14 +276,38 @@ cPluginUsbkbd::~cPluginUsbkbd()
 
 const char *cPluginUsbkbd::CommandLineHelp(void)
 {
-  return "  usbkbd event (/dev/input/eventX)\n"
-         "  default /dev/usbkbd_event\n";
+  return "  -d DEVICE, --device=DEVICE     device to read events from (/dev/input/eventX)\n"
+         "                                 default is /dev/usbkbd_event\n"
+         "  -l,        --letterdetection   detect if a keyboard is used to enter texts\n"
+         "  -k,        --keypadnumbers     use keypad numbers to enter letters by remote control\n";
 }
 
 bool cPluginUsbkbd::ProcessArgs(int argc, char *argv[])
 {
-  if(argc > 1) usbkbd_device = argv[1];
+  int c, i;
+  const char *short_options = "d:lk";
+  const struct option long_options[] = {
+    { "device",          required_argument, NULL, 'd' },
+    { "letterdetection", no_argument,       NULL, 'l' },
+    { "keypadnumbers",   no_argument,       NULL, 'k' },
+    { NULL,              0,                 NULL,  0  }
+  };
 
+  while ((c = getopt_long(argc, argv, short_options, long_options, &i)) != -1) {
+    switch (c) {
+      case 'd':
+            usbkbd_device = optarg;
+            break;
+      case 'l':
+            letter_detect = true;
+            break;
+      case 'k':
+            keypad_numbers = true;
+            break;
+      default:
+            return false;
+    }
+  }
   return true;
 }
 
