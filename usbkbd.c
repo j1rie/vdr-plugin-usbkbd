@@ -9,20 +9,18 @@
 #include <vdr/i18n.h>
 #include <vdr/remote.h>
 #include <vdr/thread.h>
+#include "input-event-codes.h"
 #include <linux/input.h>
 #include <locale.h>
-#include <getopt.h>
 #include <xkbcommon/xkbcommon.h>
 
-static const char *VERSION        = "0.2.0";
+static const char *VERSION        = "0.1.2";
 static const char *DESCRIPTION    = tr("Send keypresses from an USB keyboard to VDR");
 
-#define DEBUG 0
+#define DEBUG 1
 #define RECONNECTDELAY 3000 // ms
 
 const char* usbkbd_device = "/dev/usbkbd_event";
-bool letter_detect = false;
-bool keypad_numbers = false;
 
 class cUsbkbdRemote : public cRemote, private cThread {
 private:
@@ -57,18 +55,18 @@ bool cUsbkbdRemote::Connect()
 {
   fd = open(usbkbd_device, O_RDONLY);
   if(fd == -1){
-    if(DEBUG) printf("Cannot open %s. %s.\n", usbkbd_device, strerror(errno));
+    if (DEBUG) printf("Cannot open %s. %s.\n", usbkbd_device, strerror(errno));
     esyslog("usbkbd: Cannot open %s. %s.\n", usbkbd_device, strerror(errno));
     return false;
   } else {
-    if(DEBUG) printf("opened %s\n", usbkbd_device);
+    if (DEBUG) printf("opened %s\n", usbkbd_device);
     isyslog("usbkbd: opened %s\n", usbkbd_device);
   }
 
   /*if(ioctl(fd, EVIOCGRAB, 1)){
-    if(DEBUG) printf("Cannot grab %s. %s.\n", usbkbd_device, strerror(errno));
+    if (DEBUG) printf("Cannot grab %s. %s.\n", usbkbd_device, strerror(errno));
   } else {
-    if(DEBUG) printf("Grabbed %s!\n", usbkbd_device);
+    if (DEBUG) printf("Grabbed %s!\n", usbkbd_device);
   }*/
 
   return true;
@@ -88,11 +86,15 @@ void cUsbkbdRemote::Action(void)
   cString key = "";
   cString lastkey = "";
   bool connected = true;
-  bool letter = false;
+  char str[16];
+  int str_len = 0;
 
-  struct xkb_keymap *keymap = NULL;
-  struct xkb_state *state = NULL;
   struct xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+  if (!ctx) {
+    esyslog("usbkbd: no xkb context");
+    if (DEBUG) printf("usbkbd: no xkb context");
+  }
+  struct xkb_keymap *keymap = NULL;
   struct xkb_rule_names names = {
     .rules = getenv("XKB_DEFAULT_RULES"),
     .model = getenv("XKB_DEFAULT_MODEL"),
@@ -100,45 +102,54 @@ void cUsbkbdRemote::Action(void)
     .variant = getenv("XKB_DEFAULT_VARIANT"),
     .options = getenv("XKB_DEFAULT_OPTIONS")
   };
+  struct xkb_state *state = NULL;
   if (names.layout && *names.layout) {
-      keymap = xkb_keymap_new_from_names(ctx, &names, XKB_KEYMAP_COMPILE_NO_FLAGS);
-      if (!keymap)
+    keymap = xkb_keymap_new_from_names(ctx, &names, XKB_KEYMAP_COMPILE_NO_FLAGS);
+    if (!keymap) {
         esyslog("usbkbd: Wrong XKB_DEFAULT_* environment variables\n");
+        if (DEBUG) printf("usbkbd: Wrong XKB_DEFAULT_* environment variables\n");
+    }
   }
   if (!keymap) {
-      names.rules = NULL;
-      names.model = NULL;
-      names.variant = NULL;
-      const char* locale = I18nLocale(I18nCurrentLanguage());
-      char vdr_lang[3] = {0};
-      if (locale && strlen(locale) >= 2) {
-          vdr_lang[0] = locale[0];
-          vdr_lang[1] = locale[1];
-          names.layout = vdr_lang;
-          keymap = xkb_keymap_new_from_names(ctx, &names, XKB_KEYMAP_COMPILE_NO_FLAGS);
-          if (keymap)
+    names.rules = NULL;
+    names.model = NULL;
+    names.variant = NULL;
+    const char* locale = I18nLocale(I18nCurrentLanguage());
+    char vdr_lang[3] = {0};
+    if (locale && strlen(locale) >= 2) {
+        vdr_lang[0] = locale[0];
+        vdr_lang[1] = locale[1];
+        names.layout = vdr_lang;
+        keymap = xkb_keymap_new_from_names(ctx, &names, XKB_KEYMAP_COMPILE_NO_FLAGS);
+        if (keymap)
             isyslog("usbkbd: Fall back to vdr locale '%s' for keymap selection\n", vdr_lang);
-      }
-      if (!keymap) {
-          names.layout = "us";
-          keymap = xkb_keymap_new_from_names(ctx, &names, XKB_KEYMAP_COMPILE_NO_FLAGS);
-          if (keymap)
+    }
+    if (!keymap) {
+        names.layout = "us";
+        keymap = xkb_keymap_new_from_names(ctx, &names, XKB_KEYMAP_COMPILE_NO_FLAGS);
+        if (keymap)
             isyslog("usbkbd: Fall back to 'us' keymap\n");
-      }
+    }
   }
-  if (!keymap)
-      esyslog("usbkbd: Cannot create keymap\n");
+  if (!keymap) {
+    esyslog("usbkbd: Cannot create keymap\n");
+    if (DEBUG) printf("usbkbd: Cannot create keymap\n");
+    }
   else
-      state = xkb_state_new(keymap);
+    state = xkb_state_new(keymap);
+  if (!state) {
+    esyslog("usbkbd: Cannot create state\n");
+    if (DEBUG) printf("usbkbd: Cannot create state\n");
+    }
 
-  if(DEBUG) printf("UsbkbdRemote action!\n");
+  if (DEBUG) printf("UsbkbdRemote action!\n");
 
   while(Running()) {
     while (access(usbkbd_device, F_OK) == -1) {
       if (connected) {
           connected = false;
           esyslog("usbkbd: no connection to %s, trying to reconnect every %.1f seconds", usbkbd_device, float(RECONNECTDELAY) / 1000);
-          if(DEBUG) printf("no connection to %s, trying to reconnect every %.1f seconds\n", usbkbd_device, float(RECONNECTDELAY) / 1000);
+          if (DEBUG) printf("no connection to %s, trying to reconnect every %.1f seconds\n", usbkbd_device, float(RECONNECTDELAY) / 1000);
       }
       //ioctl(fd, EVIOCGRAB, 0);
       if (fd >= 0) {
@@ -153,7 +164,7 @@ void cUsbkbdRemote::Action(void)
             if (!connected)
                 connected = true;
             isyslog("usbkbd: reconnected to %s", usbkbd_device);
-            if(DEBUG) printf("reconnected to %s\n", usbkbd_device);
+            if (DEBUG) printf("reconnected to %s\n", usbkbd_device);
             //cCondWait::SleepMs(3); // wait a little after reconnect
         }
     }
@@ -161,12 +172,13 @@ void cUsbkbdRemote::Action(void)
     if (Ready() && read(fd, &event, sizeof(event)) != -1 && (event.type == EV_KEY)) {
 
         char buffer[64];
-        xkb_keycode_t xkb_code = event.code + 8;
+        xkb_keycode_t keycode = event.code + 8;
         if (state) {
-          if (event.value != 2)
-            xkb_state_update_key(state, xkb_code, event.value ? XKB_KEY_DOWN : XKB_KEY_UP);
-          xkb_keysym_get_name(xkb_state_key_get_one_sym(state, xkb_code), buffer, sizeof(buffer));
-          key = buffer;
+            if (event.value != 2)
+                xkb_state_update_key(state, keycode, event.value ? XKB_KEY_DOWN : XKB_KEY_UP);
+            xkb_keysym_get_name(xkb_state_key_get_one_sym(state, keycode), buffer, sizeof(buffer));
+            key = buffer;
+            str_len = xkb_state_key_get_utf8(state, keycode, str, sizeof(str));
         }
 
         int Delta = ThisTime.Elapsed(); // the time between two consecutive events
@@ -174,6 +186,7 @@ void cUsbkbdRemote::Action(void)
         ThisTime.Set();
 
         if (DEBUG) printf("key: %s, lastkey: %s  %s\n", (const char*)key, (const char*)lastkey, event.value == 0 ? "Release" : "");
+        if (DEBUG) printf("utf8: %s 0x%08x length: %d\n", (str_len > 0 && (unsigned char)str[0] >= 0x20 && (unsigned char)str[0] != 0x7F) ? str : "---", str[0], str_len);
 
         if (event.value == 1) { // new key
             if (DEBUG) printf("new key\n");
@@ -199,52 +212,25 @@ void cUsbkbdRemote::Action(void)
 
         /* send key */
         if (event.value == 1 || event.value == 2) {
-            char str[16];
-            int str_len = xkb_state_key_get_utf8(state, xkb_code, str, sizeof(str));
-            if(DEBUG) printf("delta send: %ld\n", LastTime.Elapsed());
+            if (DEBUG) printf("delta send: %ld\n", LastTime.Elapsed());
             LastTime.Set();
             if (DEBUG) printf("put %s %s\n", (const char*)key, repeat ? "Repeat" : "");
-            if (InEditMode() && state) {
-                if (str_len > 0 && ((unsigned char)str[0]) >= 32 && ((unsigned char)str[0]) != 127) {
-                    if (DEBUG) printf("Zeichen: %s %d, Name: %s, keypad_numbers: %d, letter_detect: %d, letter: %d\n", str, (unsigned char)str[0], (const char*)key, keypad_numbers, letter_detect, letter);
-                    if (str[0] >= '0' && str[0] <= '9' &&
-                        ((keypad_numbers && strncmp(key, "KP_", 3) == 0) || 
-                         (!keypad_numbers && strncmp(key, "KP_", 3) != 0 && (!letter || !letter_detect))))
-                        Put(str, repeat);
-                    else {
-                        letter = true;
-                        if (str_len == 1)
-                            Put((eKeys)(kKbd|str[0]<<16));
-                        else if (str_len == 2) {
-                            xkb_keysym_t sym = xkb_state_key_get_one_sym(state, xkb_code);
-                            Put((eKeys)(kKbd|sym << 16));
-                        }
-                    }
-                }
-                else {
-                    if (strcmp(key, "Left")   &&
-                        strcmp(key, "Right")  &&
-                        strcmp(key, "Delete") &&
-                        strcmp(key, "Insert"))
-                        letter = false;
-                    Put(key, repeat);
-                }
+
+            if (!InEditMode() || !state) {
+                Put(key, repeat);
             } else {
-                letter = false;
-                if (keypad_numbers && strncmp(key, "KP_", 3) == 0 && str[0] >= '0' && str[0] <= '9')
-                    Put(str, repeat);
+                if (str_len > 0 && (unsigned char)str[0] >= 0x20 && (unsigned char)str[0] != 0x7F)
+                        Put((eKeys)(kKbd|str[0]<<16));
                 else
-                    Put(key, repeat);
+                    Put(key, repeat); // control must work in edit mode, too, F1,F2,F3,F4 have str_len 0, Backspace and Return are below 0x20
             }
         }
 
         if (event.value == 0) { // release
             if (repeat) {
                 /* send release */
-                if (DEBUG) printf("release\n");
-                if (DEBUG) printf("delta send: %ld\n", LastTime.Elapsed());
+                if (DEBUG) printf("release\ndelta send: %ld\nput %s Release\n", LastTime.Elapsed(), (const char *)lastkey);
                 LastTime.Set();
-                if (DEBUG) printf("put %s Release\n", (const char *)lastkey);
                 Put(lastkey, false, true);
                 repeat = false;
             }
@@ -276,38 +262,14 @@ cPluginUsbkbd::~cPluginUsbkbd()
 
 const char *cPluginUsbkbd::CommandLineHelp(void)
 {
-  return "  -d DEVICE, --device=DEVICE     device to read events from (/dev/input/eventX)\n"
-         "                                 default is /dev/usbkbd_event\n"
-         "  -l,        --letterdetection   detect if a keyboard is used to enter texts\n"
-         "  -k,        --keypadnumbers     use keypad numbers to enter letters by remote control\n";
+  return "  usbkbd event (/dev/input/eventX)\n"
+         "  default /dev/usbkbd_event\n";
 }
 
 bool cPluginUsbkbd::ProcessArgs(int argc, char *argv[])
 {
-  int c, i;
-  const char *short_options = "d:lk";
-  const struct option long_options[] = {
-    { "device",          required_argument, NULL, 'd' },
-    { "letterdetection", no_argument,       NULL, 'l' },
-    { "keypadnumbers",   no_argument,       NULL, 'k' },
-    { NULL,              0,                 NULL,  0  }
-  };
+  if(argc > 1) usbkbd_device = argv[1];
 
-  while ((c = getopt_long(argc, argv, short_options, long_options, &i)) != -1) {
-    switch (c) {
-      case 'd':
-            usbkbd_device = optarg;
-            break;
-      case 'l':
-            letter_detect = true;
-            break;
-      case 'k':
-            keypad_numbers = true;
-            break;
-      default:
-            return false;
-    }
-  }
   return true;
 }
 
