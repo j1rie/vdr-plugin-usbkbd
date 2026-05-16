@@ -14,7 +14,7 @@
 #include <getopt.h>
 #include <xkbcommon/xkbcommon.h>
 
-static const char *VERSION        = "0.1.2";
+static const char *VERSION        = "0.2.0";
 static const char *DESCRIPTION    = tr("Send keypresses from an USB keyboard to VDR");
 
 #define DEBUG 0
