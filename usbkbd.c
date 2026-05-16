@@ -14,7 +14,7 @@
 #include <locale.h>
 #include <xkbcommon/xkbcommon.h>
 
-static const char *VERSION        = "0.1.2";
+static const char *VERSION        = "0.2.1";
 static const char *DESCRIPTION    = tr("Send keypresses from an USB keyboard to VDR");
 
 #define DEBUG 1
