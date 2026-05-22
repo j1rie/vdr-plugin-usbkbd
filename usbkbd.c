@@ -224,10 +224,7 @@ void cUsbkbdRemote::Action(void)
             if (!InEditMode()) {
                 Put(key, repeat);
             } else {
-                if (str_len > 0 && (unsigned char)str[0] >= 0x20 && (unsigned char)str[0] != 0x7F)
-                    if (str_len == 1)
-                        Put((eKeys)(kKbd|str[0]<<16));
-                    else
+                if (str_len > 0 && sym >= 0x20 && sym != 0x7F)
                         Put((eKeys)(kKbd|sym<<16));
                 else
                     Put(key, repeat); // control must work in edit mode, too, F1,F2,F3,F4 have str_len 0, Backspace and Return are below 0x20
