@@ -36,3 +36,6 @@ Man kann Buchstaben und Zahlen eingeben, die Farbtasten benutzen und wie gewohnt
 ## xineliboutput
 In der setup.conf sollte xineliboutput.X11.UseKeyboard = 0 sein.  
 vdr-sxfe muss mit -x gestartet werden.
+
+## Vorraussetzungen
+vdr.patch für VDR oder VDR ab 2.8.2

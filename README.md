@@ -36,3 +36,6 @@ You can enter letters and numbers, use the color buttons and navigate as usual.
 ## xineliboutput
 In setup.conf set xineliboutput.X11.UseKeyboard = 0  
 vdr-sxfe needs to be started with -x.
+
+## Requirements
+vdr.patch for VDR or VDR since 2.8.2

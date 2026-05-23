@@ -1,0 +1,54 @@
+--- menuitems.c 2025/06/18 20:22:10     5.4
++++ menuitems.c 2026/05/13 21:28:46
+@@ -406,6 +406,7 @@
+
+ cMenuEditStrItem::~cMenuEditStrItem()
+ {
++  LeaveEditMode();
+   delete[] valueUtf8;
+   delete[] allowedUtf8;
+   delete[] charMapUtf8;
+@@ -432,12 +433,14 @@
+      Utf8ToArray(charMap, charMapUtf8, l);
+      currentCharUtf8 = charMapUtf8;
+      AdvancePos();
++     cRemote::SetInEditMode(true);
+      }
+ }
+
+ void cMenuEditStrItem::LeaveEditMode(bool SaveValue)
+ {
+   if (valueUtf8) {
++     cRemote::SetInEditMode(false);
+      if (SaveValue) {
+         Utf8FromArray(valueUtf8, value, length);
+         if (!keepSpace)
+--- remote.c    2019/05/13 13:01:44     5.0
++++ remote.c    2026/05/13 14:25:31
+@@ -34,6 +34,7 @@
+ const char *cRemote::keyMacroPlugin = NULL;
+ const char *cRemote::callPlugin = NULL;
+ bool cRemote::enabled = true;
++bool cRemote::inEditMode = false;
+ time_t cRemote::lastActivity = 0;
+
+ cRemote::cRemote(const char *Name)
+--- remote.h    2025/03/02 11:03:35     5.1
++++ remote.h    2026/05/13 14:25:31
+@@ -32,6 +32,7 @@
+   static const char *keyMacroPlugin;
+   static const char *callPlugin;
+   static bool enabled;
++  static bool inEditMode;
+   char *name;
+ protected:
+   cRemote(const char *Name);
+@@ -48,6 +49,8 @@
+   static bool IsLearning() { return learning != NULL; }
+   static bool Enabled(void) { return enabled; }
+   static void SetEnabled(bool Enabled) { enabled = Enabled; }
++  static bool InEditMode(void) { return inEditMode; }
++  static void SetInEditMode(bool InEditMode) { inEditMode = InEditMode; }
+   static void Clear(void);
+   static bool Put(eKeys Key, bool AtFront = false);
+   static bool PutMacro(eKeys Key);
