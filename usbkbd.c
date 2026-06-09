@@ -191,7 +191,7 @@ void cUsbkbdRemote::Action(void)
         ThisTime.Set();
 
         if (DEBUG) printf("key: %s, lastkey: %s  %s\n", (const char*)key, (const char*)lastkey, event.value == 0 ? "Release" : "");
-        if (DEBUG) printf("utf8: %s 0x%08x length: %d\n", (str_len > 0 && (unsigned char)str[0] >= 0x20 && (unsigned char)str[0] != 0x7F) ? str : "---", str[0], str_len);
+        if (DEBUG) printf("utf8: %s 0x%08x length: %d sym: 0x%08x\n", (str_len > 0 && (unsigned char)str[0] >= 0x20 && (unsigned char)str[0] != 0x7F) ? str : "---", str[0], str_len, sym);
 
         if (event.value == 1) { // new key
             if (DEBUG) printf("new key\n");
@@ -224,8 +224,10 @@ void cUsbkbdRemote::Action(void)
             if (!InEditMode()) {
                 Put(key, repeat);
             } else {
-                if (str_len > 0 && sym >= 0x20 && sym != 0x7F)
+                if (str_len > 0 && (sym & 0xFF) >= 0x20 && sym != 0x7F)
                         Put((eKeys)(kKbd|sym<<16));
+                else if (sym == 0xfe52) // circumflex
+                        Put((eKeys)(kKbd|0x5E<<16));
                 else
                     Put(key, repeat); // control must work in edit mode, too, F1,F2,F3,F4 have str_len 0, Backspace and Return are below 0x20
             }
